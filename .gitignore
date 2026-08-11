@@ -1,0 +1,21 @@
+# Dependency directories
+.venv/
+
+# Environment files
+.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
