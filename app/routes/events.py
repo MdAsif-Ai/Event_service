@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date, time
+
+from fastapi import APIRouter, Depends, Form, HTTPException, status
+from pydantic import HttpUrl, TypeAdapter, ValidationError
 
 from app.database import events_collection
 from app.dependencies.auth import verify_api_key
-from app.schemas.event import EventCreate, EventResponse
+from app.schemas.event import EventResponse
 
 
 router = APIRouter(
@@ -11,25 +14,154 @@ router = APIRouter(
 )
 
 
+http_url_adapter = TypeAdapter(HttpUrl)
+
+
+def parse_comma_separated_urls(value: str) -> list[HttpUrl]:
+    """
+    Convert comma-separated URLs into a list of validated URLs.
+    """
+
+    if not value.strip():
+        return []
+
+    urls = []
+
+    for item in value.split(","):
+        item = item.strip()
+
+        if not item:
+            continue
+
+        try:
+            urls.append(
+                http_url_adapter.validate_python(item)
+            )
+        except ValidationError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid URL: {item}",
+            )
+
+    return urls
+
+
+def parse_comma_separated_strings(value: str) -> list[str]:
+    """
+    Convert comma-separated text into a list of strings.
+    """
+
+    if not value.strip():
+        return []
+
+    return [
+        item.strip()
+        for item in value.split(",")
+        if item.strip()
+    ]
+
+
 @router.post(
     "",
     response_model=EventResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(verify_api_key)],
 )
-def create_event(event: EventCreate) -> EventResponse:
+def create_event(
+    title: str = Form(...),
+    description: str = Form(...),
+
+    photos: str = Form(
+        default="",
+        description=(
+            "Comma-separated image URLs. "
+            "Example: https://example.com/image1.jpg,"
+            "https://example.com/image2.jpg"
+        ),
+    ),
+
+    student_coordinators: str = Form(
+        default="",
+        description="Comma-separated student coordinator names.",
+    ),
+
+    staff_coordinators: str = Form(
+        default="",
+        description="Comma-separated staff coordinator names.",
+    ),
+
+    chief_guest: str = Form(...),
+
+    chief_guest_profile_urls: str = Form(
+        default="",
+        description="Comma-separated chief guest profile image URLs.",
+    ),
+
+    date: date = Form(...),
+
+    time: time = Form(...),
+
+    venue: str = Form(...),
+
+    registration_form_link: HttpUrl = Form(...),
+) -> EventResponse:
     """
     Create a new event.
+
+    Image files are NOT stored by this API.
+    The API receives image URLs and stores those URLs in MongoDB.
     """
 
-    event_data = event.model_dump(mode="json")
+    photo_urls = parse_comma_separated_urls(photos)
 
-    result = events_collection.insert_one(event_data)
+    chief_guest_urls = parse_comma_separated_urls(
+        chief_guest_profile_urls
+    )
+
+    student_list = parse_comma_separated_strings(
+        student_coordinators
+    )
+
+    staff_list = parse_comma_separated_strings(
+        staff_coordinators
+    )
+
+    event_data = {
+        "title": title.strip(),
+        "description": description.strip(),
+        "photos": [
+            str(url)
+            for url in photo_urls
+        ],
+        "student_coordinators": student_list,
+        "staff_coordinators": staff_list,
+        "chief_guest": chief_guest.strip(),
+        "chief_guest_profile_urls": [
+            str(url)
+            for url in chief_guest_urls
+        ],
+        "date": date.isoformat(),
+        "time": time.isoformat(),
+        "venue": venue.strip(),
+        "registration_form_link": str(
+            registration_form_link
+        ),
+    }
+
+    try:
+        result = events_collection.insert_one(
+            event_data
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create event.",
+        ) from exc
 
     if not result.acknowledged:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create event",
+            detail="Failed to create event.",
         )
 
     return EventResponse(**event_data)
@@ -45,12 +177,19 @@ def get_events() -> list[EventResponse]:
     Return all events.
     """
 
-    events = events_collection.find(
-        {},
-        {"_id": 0},
-    )
+    try:
+        events = events_collection.find(
+            {},
+            {"_id": 0},
+        )
 
-    return [
-        EventResponse(**event)
-        for event in events
-    ]
+        return [
+            EventResponse(**event)
+            for event in events
+        ]
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve events.",
+        ) from exc

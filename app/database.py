@@ -15,9 +15,8 @@ events_collection = database["events"]
 
 
 def check_database_connection() -> bool:
-    """
-    Check whether MongoDB is reachable.
-    """
+    """Check whether MongoDB is reachable."""
+
     try:
         client.admin.command("ping")
         return True

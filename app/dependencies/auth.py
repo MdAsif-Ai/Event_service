@@ -1,19 +1,26 @@
 import hashlib
 import secrets
 
-from fastapi import Header, HTTPException, status
+from fastapi import HTTPException, Security, status
+from fastapi.security import APIKeyHeader
 
 from app.config import settings
 
 
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    auto_error=False,
+)
+
+
 def verify_api_key(
-    x_api_key: str | None = Header(default=None),
+    x_api_key: str | None = Security(api_key_header),
 ) -> None:
     """
-    Verify the API key provided in the X-API-Key header.
+    Verify the API key supplied in the X-API-Key header.
 
-    The received API key is hashed with SHA-256 and
-    compared against the configured API_KEY_HASH.
+    The API key itself is never stored.
+    Its SHA-256 hash is compared with API_KEY_HASH.
     """
 
     if not x_api_key:

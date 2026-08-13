@@ -5,7 +5,10 @@ from app.routes.events import router as events_router
 
 app = FastAPI(
     title="Event Management API",
-    description="Microservice for managing college events",
+    description=(
+        "Microservice for creating and retrieving "
+        "college events."
+    ),
     version="1.0.0",
 )
 
@@ -13,6 +16,11 @@ app = FastAPI(
 app.include_router(events_router)
 
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+@app.get(
+    "/health",
+    tags=["Health"],
+)
+def health() -> dict[str, str]:
+    return {
+        "status": "ok"
+    }
