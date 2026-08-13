@@ -4,7 +4,7 @@ from app.routes.events import router as events_router
 
 
 app = FastAPI(
-    title="Event Management API",
+    title="Event Management API     --By Md-Asif",
     description=(
         "Microservice for creating and retrieving "
         "college events."
