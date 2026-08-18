@@ -34,4 +34,4 @@ class EventResponse(BaseModel):
 
     venue: str
 
-    registration_form_link: HttpUrl
+    registration_form_link: HttpUrl | None =None 

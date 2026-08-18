@@ -6,7 +6,9 @@ from pydantic import HttpUrl, TypeAdapter, ValidationError
 from app.database import events_collection
 from app.dependencies.auth import verify_api_key
 from app.schemas.event import EventResponse
+import logging
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/events",
@@ -103,7 +105,10 @@ def create_event(
 
     venue: str = Form(...),
 
-    registration_form_link: HttpUrl = Form(...),
+    registration_form_link: HttpUrl | None = Form(
+        default=None,
+        description="Registration Form link optional"
+    ),
 ) -> EventResponse:
     """
     Create a new event.
@@ -143,8 +148,10 @@ def create_event(
         "date": date.isoformat(),
         "time": time.isoformat(),
         "venue": venue.strip(),
-        "registration_form_link": str(
-            registration_form_link
+        "registration_form_link": (
+            str(registration_form_link)
+            if registration_form_link is not None
+            else None
         ),
     }
 
@@ -188,8 +195,9 @@ def get_events() -> list[EventResponse]:
             for event in events
         ]
 
-    except Exception as exc:
+    except Exception as e:
+        logger.exception("Failed to create event")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve events.",
-        ) from exc
+            status_code=500,
+            detail=f"MongoDB error: {str(e)}"
+        ) from e
